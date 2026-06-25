@@ -14,7 +14,7 @@
 <dependency>
     <groupId>ru.vych</groupId>
     <artifactId>http-client-spring-boot-starter</artifactId>
-    <version>0.0.2-RELEASE</version>
+    <version>0.0.3-RELEASE</version>
 </dependency>
 ```
 
