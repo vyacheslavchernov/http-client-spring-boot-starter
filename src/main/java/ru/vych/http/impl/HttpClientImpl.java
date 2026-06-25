@@ -1,9 +1,15 @@
 package ru.vych.http.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import ru.vych.http.config.HttpClientConfig;
+import ru.vych.http.impl.exceptions.HttpClientConfigurationException;
+import ru.vych.http.impl.exceptions.HttpClientException;
+import ru.vych.http.impl.exceptions.HttpClientInvalidRequestException;
 
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.HttpCookie;
@@ -25,8 +31,7 @@ public class HttpClientImpl implements HttpClient {
     private final java.net.http.HttpClient client;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    @SneakyThrows
-    public HttpClientImpl(HttpClientConfig config) {
+    public HttpClientImpl(HttpClientConfig config) throws HttpClientException {
         this.config = config;
 
         var clientBuilder = java.net.http.HttpClient.newBuilder()
@@ -34,7 +39,12 @@ public class HttpClientImpl implements HttpClient {
                 .followRedirects(config.getAllowRedirects() ? ALWAYS : NEVER);
 
         if (config.getStoreCookies()) {
-            clientBuilder.cookieHandler(config.getCookieHandlerClass().getConstructor().newInstance());
+            try {
+                clientBuilder.cookieHandler(config.getCookieHandlerClass().getConstructor().newInstance());
+            } catch (InstantiationException | NoSuchMethodException |
+                     InvocationTargetException | IllegalAccessException e) {
+                throw new HttpClientConfigurationException("Не удалось создать экземпляр хранилища cookie", e);
+            }
         }
 
         this.client = clientBuilder.build();
@@ -53,16 +63,14 @@ public class HttpClientImpl implements HttpClient {
     }
 
     @Override
-    @SneakyThrows
-    public Response execute(Request request) {
+    public Response execute(Request request) throws HttpClientException {
         return switch (request.getMethod()) {
             case GET -> get(request);
-            default -> new Response(request, 666, "Unknown http method " + request.getMethod(), null);
+            default -> throw new HttpClientInvalidRequestException("Неизвестный http-метод + request.getMethod()");
         };
     }
 
-    @SneakyThrows
-    private Response get(Request request) {
+    private Response get(Request request) throws HttpClientException {
         var root = config.getRoot().endsWith("/") ? config.getRoot() : config.getRoot() + "/";
 
         var path = request.getUrl().startsWith("/") ? request.getUrl().substring(1) : request.getUrl();
@@ -89,7 +97,12 @@ public class HttpClientImpl implements HttpClient {
         config.getHeaders().forEach(rsBuilder::header);
         request.getHeaders().forEach(rsBuilder::header);
 
-        var rs = client.send(rsBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> rs;
+        try {
+            rs = client.send(rsBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            throw new HttpClientException("Ошибка при отправке запроса", e);
+        }
         return new Response(
                 request,
                 rs.statusCode(),
@@ -98,11 +111,14 @@ public class HttpClientImpl implements HttpClient {
                 );
     }
 
-    @SneakyThrows
-    private Object mapBodyToResponseClass(String body, Class<?> responseClass) {
+    private Object mapBodyToResponseClass(String body, Class<?> responseClass) throws HttpClientException {
         if (responseClass == String.class) {
             return body;
         }
-        return mapper.readValue(body, responseClass);
+        try {
+            return mapper.readValue(body, responseClass);
+        } catch (JsonProcessingException e) {
+            throw new HttpClientException("Ошибка при обработке ответа", e);
+        }
     }
 }
