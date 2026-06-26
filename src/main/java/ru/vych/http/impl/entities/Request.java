@@ -1,10 +1,11 @@
-package ru.vych.http.impl;
+package ru.vych.http.impl.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
+import ru.vych.http.impl.common.HttpMethod;
 import ru.vych.http.impl.exceptions.HttpClientInvalidRequestException;
 
 import java.util.HashMap;

@@ -3,8 +3,13 @@ package ru.vych.http.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ru.vych.http.config.HttpClientConfig;
+import ru.vych.http.impl.common.HttpStatus;
+import ru.vych.http.impl.entities.Request;
+import ru.vych.http.impl.entities.Response;
 import ru.vych.http.impl.exceptions.HttpClientConfigurationException;
 import ru.vych.http.impl.exceptions.HttpClientException;
+import ru.vych.http.impl.exceptions.HttpClientExecuteRequestException;
+import ru.vych.http.impl.exceptions.HttpClientHandleResponseException;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.CookieHandler;
@@ -84,7 +89,7 @@ public class HttpClientImpl implements HttpClient {
         try {
             rs = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (Exception e) {
-            throw new HttpClientException("Ошибка при отправке запроса", e);
+            throw new HttpClientExecuteRequestException("Ошибка при отправке запроса", e);
         }
         return buildResponse(rs, request);
     }
@@ -98,7 +103,7 @@ public class HttpClientImpl implements HttpClient {
         try {
             rs = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (Exception e) {
-            throw new HttpClientException("Ошибка при отправке запроса", e);
+            throw new HttpClientExecuteRequestException("Ошибка при отправке запроса", e);
         }
         return buildResponse(rs, request);
     }
@@ -125,7 +130,7 @@ public class HttpClientImpl implements HttpClient {
             );
 
         } catch (JsonProcessingException e) {
-            throw new HttpClientException("Ошибка при обработке тела запроса", e);
+            throw new HttpClientHandleResponseException("Ошибка при обработке тела запроса", e);
         }
     }
 
@@ -163,27 +168,28 @@ public class HttpClientImpl implements HttpClient {
             return body;
         }
 
-        if (responseClass == null || responseClass == byte.class) {
+        if (responseClass == null || responseClass == byte.class || responseClass == byte[].class) {
             return null;
         }
 
         try {
             return mapper.readValue(body, responseClass);
         } catch (JsonProcessingException e) {
-            throw new HttpClientException("Ошибка при обработке ответа", e);
+            throw new HttpClientHandleResponseException("Ошибка при обработке ответа", e);
         }
     }
 
     private Response buildResponse(HttpResponse<byte[]> httpResponse, Request request) throws HttpClientException {
         String bodyText = new String(httpResponse.body(), StandardCharsets.UTF_8);
+        var rsType = request.getResponseClass();
         return new Response(
                 request,
                 httpResponse.statusCode(),
                 httpResponse.body(),
-                httpResponse.statusCode() != 200 || request.getResponseClass() != null && request.getResponseClass() != byte.class
+                httpResponse.statusCode() != HttpStatus.OK || rsType != null && rsType != byte.class && rsType != byte[].class
                         ? bodyText
                         : null,
-                httpResponse.statusCode() != 200
+                httpResponse.statusCode() != HttpStatus.OK
                         ? null
                         : mapBodyToResponseClass(bodyText, request.getResponseClass())
         );
