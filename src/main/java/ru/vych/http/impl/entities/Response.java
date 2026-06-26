@@ -1,4 +1,4 @@
-package ru.vych.http.impl;
+package ru.vych.http.impl.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -17,6 +17,13 @@ public class Response {
     private final String rawBody;
     private final Object body;
 
+    /**
+     * Получить тело ответа кастованное в соответствующий ответу класс,
+     * который был передан в запросе.
+     *
+     * @param <T> класс ответа
+     * @return кастованное тело ответа
+     */
     @SuppressWarnings("unchecked")
     public <T> T getCastedBody() {
         return (T) request.getResponseClass().cast(body);

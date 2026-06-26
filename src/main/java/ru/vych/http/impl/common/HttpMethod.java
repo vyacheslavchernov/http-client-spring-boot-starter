@@ -1,4 +1,4 @@
-package ru.vych.http.impl;
+package ru.vych.http.impl.common;
 
 /**
  * Перечисление методов HTTP запросов
