@@ -2,15 +2,18 @@ package ru.vych.http.impl;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.ToString;
 
 /**
  * Класс ответа
  */
 @AllArgsConstructor
 @Getter
+@ToString
 public class Response {
     private final Request request;
     private final Integer status;
+    private final byte[] rawBytes;
     private final String rawBody;
     private final Object body;
 
