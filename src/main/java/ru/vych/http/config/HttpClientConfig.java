@@ -6,6 +6,7 @@ import lombok.experimental.Accessors;
 
 import java.net.CookieHandler;
 import java.net.CookieManager;
+import java.net.http.HttpClient;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,4 +52,9 @@ public class HttpClientConfig {
      * Следует ли переходить по полученным редиректам
      */
     private Boolean allowRedirects = false;
+
+    /**
+     * Версия протокола http, которая будет использовать там, где это возможно
+     */
+    private HttpClient.Version version = HttpClient.Version.HTTP_1_1;
 }

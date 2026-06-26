@@ -13,7 +13,7 @@
 
     <groupId>ru.vych</groupId>
     <artifactId>http-client-spring-boot-starter</artifactId>
-    <version>0.0.1-DEV-STABLE</version>
+    <version>0.0.2-RELEASE</version>
 
     <packaging>jar</packaging>
 
@@ -49,5 +49,13 @@
             <scope>compile</scope>
         </dependency>
     </dependencies>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/vyacheslavchernov/http-client-spring-boot-starter</url>
+        </repository>
+    </distributionManagement>
 
 </project>
