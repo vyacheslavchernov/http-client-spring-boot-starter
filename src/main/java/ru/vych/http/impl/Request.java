@@ -3,7 +3,9 @@ package ru.vych.http.impl;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.Accessors;
+import ru.vych.http.impl.exceptions.HttpClientInvalidRequestException;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -16,6 +18,7 @@ import java.util.Map;
 @Getter
 @AllArgsConstructor
 @Accessors(chain = true)
+@ToString
 public class Request {
     private String url;
     private HttpMethod method;
@@ -23,6 +26,7 @@ public class Request {
     private List<String> pathParams;
     private Map<String, String> headers;
     private Class<?> responseClass;
+    private Object payload;
 
     public static Builder builder() {
         return new Builder();
@@ -37,6 +41,9 @@ public class Request {
         private List<String> pathParams = new LinkedList<>();
         private Map<String, String> headers = new HashMap<>();
         private Class<?> responseClass;
+        private Object payload;
+
+        private String contentType;
 
         public Builder addQueryParam(String key, String value) {
             queryParams.put(key, value);
@@ -48,16 +55,31 @@ public class Request {
             return this;
         }
 
-        public Request build() {
+        public Builder addHeader(String name, String value) {
+            headers.put(name, value);
+            return this;
+        }
+
+        public Request build() throws HttpClientInvalidRequestException {
             if (method == null) {
-                throw new IllegalStateException("Для запроса необходимо указать используемый HTTP метод.");
+                throw new HttpClientInvalidRequestException("Для запроса необходимо указать используемый HTTP метод.");
             }
 
-            if (responseClass == null) {
-                throw new IllegalStateException("Для запроса необходимо указать класс ответа.");
+            if ((method == HttpMethod.POST && payload != null) && (contentType == null || contentType.isEmpty())) {
+                throw new HttpClientInvalidRequestException("Для POST запроса необходимо указать тип передаваемого контента.");
             }
 
-            return new Request(url, method, queryParams, pathParams, headers, responseClass);
+            if (contentType != null) {
+                this.addHeader("Content-Type", contentType);
+            }
+
+            var request = new Request(
+                    url, method, queryParams,
+                    pathParams, headers, responseClass,
+                    payload
+            );
+
+            return request;
         }
     }
 }
