@@ -1,5 +1,7 @@
 package ru.vych.http.impl;
 
+import ru.vych.http.impl.entities.Request;
+import ru.vych.http.impl.entities.Response;
 import ru.vych.http.impl.exceptions.HttpClientException;
 
 import java.net.CookieHandler;
@@ -22,4 +24,6 @@ public interface HttpClient {
      * @return обработчик cookies
      */
     CookieHandler getCookieHandler();
+
+    String getClientUuid();
 }

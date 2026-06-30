@@ -2,9 +2,16 @@ package ru.vych.http.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import ru.vych.http.config.HttpClientConfig;
+import ru.vych.http.impl.common.HttpStatus;
+import ru.vych.http.impl.entities.Request;
+import ru.vych.http.impl.entities.Response;
 import ru.vych.http.impl.exceptions.HttpClientConfigurationException;
 import ru.vych.http.impl.exceptions.HttpClientException;
+import ru.vych.http.impl.exceptions.HttpClientExecuteRequestException;
+import ru.vych.http.impl.exceptions.HttpClientHandleResponseException;
+import ru.vych.logger.impl.LogService;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.CookieHandler;
@@ -16,6 +23,7 @@ import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.net.http.HttpClient.Redirect.ALWAYS;
@@ -26,12 +34,17 @@ import static java.time.temporal.ChronoUnit.MILLIS;
  * Реализация http-клиента
  */
 public class HttpClientImpl implements HttpClient {
-    private final HttpClientConfig config;
+    @Getter
+    private final String clientUuid = UUID.randomUUID().toString();
     private final java.net.http.HttpClient client;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public HttpClientImpl(HttpClientConfig config) throws HttpClientException {
+    private final HttpClientConfig config;
+    private final LogService logService;
+
+    public HttpClientImpl(HttpClientConfig config, LogService logService) throws HttpClientException {
         this.config = config;
+        this.logService = logService;
 
         java.net.http.HttpClient.Builder clientBuilder;
         try {
@@ -40,6 +53,10 @@ public class HttpClientImpl implements HttpClient {
                     .followRedirects(config.getAllowRedirects() ? ALWAYS : NEVER)
                     .version(config.getVersion());
         } catch (IllegalArgumentException e) {
+            logService.error(
+                    config.getServiceCode(), clientUuid, "Ошибка инициализации клиента",
+                    config, e.toString()
+            );
             throw new HttpClientConfigurationException("Некорректная конфигурация http-клиента", e);
         }
 
@@ -48,6 +65,10 @@ public class HttpClientImpl implements HttpClient {
                 clientBuilder.cookieHandler(config.getCookieHandlerClass().getConstructor().newInstance());
             } catch (InstantiationException | NoSuchMethodException |
                      InvocationTargetException | IllegalAccessException e) {
+                logService.error(
+                        config.getServiceCode(), clientUuid, "Ошибка инициализации клиента",
+                        config, e.toString()
+                );
                 throw new HttpClientConfigurationException("Не удалось создать экземпляр хранилища cookie", e);
             }
         }
@@ -60,6 +81,8 @@ public class HttpClientImpl implements HttpClient {
                     cookies.getCookieStore().add(URI.create("*"), new HttpCookie(key, value))
             );
         }
+
+        logService.info(config.getServiceCode(), clientUuid, "Инициализирован Http-Client", config);
     }
 
     @Override
@@ -69,10 +92,15 @@ public class HttpClientImpl implements HttpClient {
 
     @Override
     public Response execute(Request request) throws HttpClientException {
-        return switch (request.getMethod()) {
+        logService.debug(config.getServiceCode(), request.getUuid(), "Отправка Http-запроса", request);
+
+        Response response = switch (request.getMethod()) {
             case GET -> get(request);
             case POST -> post(request);
         };
+
+        logService.debug(config.getServiceCode(), request.getUuid(), "Получен ответ", response);
+        return response;
     }
 
     private Response get(Request request) throws HttpClientException {
@@ -84,7 +112,11 @@ public class HttpClientImpl implements HttpClient {
         try {
             rs = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (Exception e) {
-            throw new HttpClientException("Ошибка при отправке запроса", e);
+            logService.error(
+                    config.getServiceCode(), clientUuid, "Ошибка при отправке запроса",
+                    request, e.toString()
+            );
+            throw new HttpClientExecuteRequestException("Ошибка при отправке запроса", e);
         }
         return buildResponse(rs, request);
     }
@@ -98,7 +130,10 @@ public class HttpClientImpl implements HttpClient {
         try {
             rs = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (Exception e) {
-            throw new HttpClientException("Ошибка при отправке запроса", e);
+            logService.error(
+                    config.getServiceCode(), clientUuid, "Ошибка при отправке запроса",
+                    request, e.toString());
+            throw new HttpClientExecuteRequestException("Ошибка при отправке запроса", e);
         }
         return buildResponse(rs, request);
     }
@@ -125,7 +160,10 @@ public class HttpClientImpl implements HttpClient {
             );
 
         } catch (JsonProcessingException e) {
-            throw new HttpClientException("Ошибка при обработке тела запроса", e);
+            logService.error(
+                    config.getServiceCode(), clientUuid, "Ошибка при обработке тела запроса",
+                    payload, e.toString());
+            throw new HttpClientHandleResponseException("Ошибка при обработке тела запроса", e);
         }
     }
 
@@ -163,27 +201,32 @@ public class HttpClientImpl implements HttpClient {
             return body;
         }
 
-        if (responseClass == null || responseClass == byte.class) {
+        if (responseClass == null || responseClass == byte.class || responseClass == byte[].class) {
             return null;
         }
 
         try {
             return mapper.readValue(body, responseClass);
         } catch (JsonProcessingException e) {
-            throw new HttpClientException("Ошибка при обработке ответа", e);
+            logService.error(
+                    config.getServiceCode(), clientUuid, "Ошибка при обработке ответа",
+                    body, responseClass, e.toString());
+            throw new HttpClientHandleResponseException("Ошибка при обработке ответа", e);
         }
     }
 
     private Response buildResponse(HttpResponse<byte[]> httpResponse, Request request) throws HttpClientException {
         String bodyText = new String(httpResponse.body(), StandardCharsets.UTF_8);
+        var rsType = request.getResponseClass();
         return new Response(
+                request.getUuid(),
                 request,
                 httpResponse.statusCode(),
                 httpResponse.body(),
-                httpResponse.statusCode() != 200 || request.getResponseClass() != null && request.getResponseClass() != byte.class
+                httpResponse.statusCode() != HttpStatus.OK || rsType != null && rsType != byte.class && rsType != byte[].class
                         ? bodyText
                         : null,
-                httpResponse.statusCode() != 200
+                httpResponse.statusCode() != HttpStatus.OK
                         ? null
                         : mapBodyToResponseClass(bodyText, request.getResponseClass())
         );

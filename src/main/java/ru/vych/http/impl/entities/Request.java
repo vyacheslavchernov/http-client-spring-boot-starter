@@ -1,16 +1,14 @@
-package ru.vych.http.impl;
+package ru.vych.http.impl.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
+import ru.vych.http.impl.common.HttpMethod;
 import ru.vych.http.impl.exceptions.HttpClientInvalidRequestException;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Класс запроса через http-клиент
@@ -20,6 +18,7 @@ import java.util.Map;
 @Accessors(chain = true)
 @ToString
 public class Request {
+    private final String uuid = UUID.randomUUID().toString();
     private String url;
     private HttpMethod method;
     private Map<String, String> queryParams;
@@ -45,8 +44,16 @@ public class Request {
 
         private String contentType;
 
+        public Builder setQueryParams(Map<String, String> params) {
+            params.remove(null);
+            this.queryParams = params;
+            return this;
+        }
+
         public Builder addQueryParam(String key, String value) {
-            queryParams.put(key, value);
+            if (key != null) {
+                queryParams.put(key, value);
+            }
             return this;
         }
 

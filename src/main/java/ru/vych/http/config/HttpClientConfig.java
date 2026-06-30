@@ -1,6 +1,7 @@
 package ru.vych.http.config;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
@@ -16,7 +17,13 @@ import java.util.Map;
 @Getter
 @Setter
 @Accessors(chain = true)
+@RequiredArgsConstructor
 public class HttpClientConfig {
+    /**
+     * Сервис-код клиента
+     */
+    private final String serviceCode;
+
     /**
      * Корневая точка для клиента.
      * От неё будут производиться все запросы.
