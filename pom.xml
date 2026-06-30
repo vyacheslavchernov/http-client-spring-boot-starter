@@ -13,7 +13,7 @@
 
     <groupId>ru.vych</groupId>
     <artifactId>http-client-spring-boot-starter</artifactId>
-    <version>0.0.3-DEV-UNSTABLE</version>
+    <version>0.0.3-DEV</version>
 
     <packaging>jar</packaging>
 
@@ -30,9 +30,10 @@
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
+            <groupId>ru.vych</groupId>
+            <artifactId>logger-spring-boot-starter</artifactId>
+            <version>0.0.1-RELEASE</version>
+            <scope>compile</scope>
         </dependency>
 
         <dependency>
