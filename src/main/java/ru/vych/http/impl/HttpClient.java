@@ -24,4 +24,6 @@ public interface HttpClient {
      * @return обработчик cookies
      */
     CookieHandler getCookieHandler();
+
+    String getClientUuid();
 }
