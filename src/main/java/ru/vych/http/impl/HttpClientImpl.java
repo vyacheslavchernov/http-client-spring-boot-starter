@@ -3,14 +3,18 @@ package ru.vych.http.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import ru.vych.http.config.HttpClientConfig;
 import ru.vych.http.impl.common.HttpStatus;
+import ru.vych.http.impl.entities.Header;
 import ru.vych.http.impl.entities.Request;
 import ru.vych.http.impl.entities.Response;
 import ru.vych.http.impl.exceptions.HttpClientConfigurationException;
 import ru.vych.http.impl.exceptions.HttpClientException;
 import ru.vych.http.impl.exceptions.HttpClientExecuteRequestException;
 import ru.vych.http.impl.exceptions.HttpClientHandleResponseException;
+import ru.vych.http.impl.interceptors.RequestInterceptor;
+import ru.vych.http.impl.interceptors.ResponseInterceptor;
 import ru.vych.logger.impl.LogService;
 
 import java.lang.reflect.InvocationTargetException;
@@ -23,6 +27,8 @@ import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -33,6 +39,7 @@ import static java.time.temporal.ChronoUnit.MILLIS;
 /**
  * Реализация http-клиента
  */
+@Slf4j
 public class HttpClientImpl implements HttpClient {
     @Getter
     private final String clientUuid = UUID.randomUUID().toString();
@@ -41,10 +48,17 @@ public class HttpClientImpl implements HttpClient {
 
     private final HttpClientConfig config;
     private final LogService logService;
+    private final List<RequestInterceptor> requestInterceptors = new ArrayList<>();
+    private final List<ResponseInterceptor> responseInterceptors = new ArrayList<>();
 
-    public HttpClientImpl(HttpClientConfig config, LogService logService) throws HttpClientException {
+    public HttpClientImpl(
+            HttpClientConfig config, LogService logService,
+            List<RequestInterceptor> requestInterceptors, List<ResponseInterceptor> responseInterceptors
+    ) throws HttpClientException {
         this.config = config;
         this.logService = logService;
+        this.requestInterceptors.addAll(requestInterceptors);
+        this.responseInterceptors.addAll(responseInterceptors);
 
         java.net.http.HttpClient.Builder clientBuilder;
         try {
@@ -60,6 +74,8 @@ public class HttpClientImpl implements HttpClient {
             throw new HttpClientConfigurationException("Некорректная конфигурация http-клиента", e);
         }
 
+        // TODO: хендлер кук должен создаваться всегда. Управлять сохранением кук через CookiePolicy.
+        //  Добавлять куки из конфига клиента в хендлер при инициализации клиента.
         if (config.getStoreCookies()) {
             try {
                 clientBuilder.cookieHandler(config.getCookieHandlerClass().getConstructor().newInstance());
@@ -92,6 +108,13 @@ public class HttpClientImpl implements HttpClient {
 
     @Override
     public Response execute(Request request) throws HttpClientException {
+        requestInterceptors.forEach(filter -> {
+            logService.debug(
+                    config.getServiceCode(), request.getUuid(),
+                    "Выполнение фильтра запроса", filter.getClass().getCanonicalName()
+            );
+            filter.handle(this, request);
+        });
         logService.debug(config.getServiceCode(), request.getUuid(), "Отправка Http-запроса", request);
 
         Response response = switch (request.getMethod()) {
@@ -99,7 +122,15 @@ public class HttpClientImpl implements HttpClient {
             case POST -> post(request);
         };
 
+        responseInterceptors.forEach(filter -> {
+            logService.debug(
+                    config.getServiceCode(), request.getUuid(),
+                    "Выполнение фильтра ответа", filter.getClass().getCanonicalName()
+            );
+            filter.handle(this, response);
+        });
         logService.debug(config.getServiceCode(), request.getUuid(), "Получен ответ", response);
+
         return response;
     }
 
@@ -193,7 +224,7 @@ public class HttpClientImpl implements HttpClient {
 
     private void addHeaders(Builder builder, Request request) {
         config.getHeaders().forEach(builder::header);
-        request.getHeaders().forEach(builder::header);
+        request.getHeaders().forEach(header -> builder.header(header.name(), header.value()));
     }
 
     private Object mapBodyToResponseClass(String body, Class<?> responseClass) throws HttpClientException {
@@ -228,7 +259,18 @@ public class HttpClientImpl implements HttpClient {
                         : null,
                 httpResponse.statusCode() != HttpStatus.OK
                         ? null
-                        : mapBodyToResponseClass(bodyText, request.getResponseClass())
+                        : mapBodyToResponseClass(bodyText, request.getResponseClass()),
+                extractHeaders(httpResponse)
         );
+    }
+
+    private List<Header> extractHeaders(HttpResponse<byte[]> httpResponse) {
+        List<Header> headers = new ArrayList<>();
+        httpResponse.headers().map().forEach((name, values) -> {
+            values.forEach(value -> {
+                headers.add(new Header(name, value));
+            });
+        });
+        return headers;
     }
 }

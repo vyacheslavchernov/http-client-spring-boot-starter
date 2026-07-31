@@ -19,12 +19,19 @@ import java.util.*;
 @ToString
 public class Request {
     private final String uuid = UUID.randomUUID().toString();
+    @Setter
     private String url;
+    @Setter
     private HttpMethod method;
+    @Setter
     private Map<String, String> queryParams;
+    @Setter
     private List<String> pathParams;
-    private Map<String, String> headers;
+    @Setter
+    private List<Header> headers;
+    @Setter
     private Class<?> responseClass;
+    @Setter
     private Object payload;
 
     public static Builder builder() {
@@ -38,7 +45,7 @@ public class Request {
         private HttpMethod method;
         private Map<String, String> queryParams = new HashMap<>();
         private List<String> pathParams = new LinkedList<>();
-        private Map<String, String> headers = new HashMap<>();
+        private List<Header> headers = new LinkedList<>();
         private Class<?> responseClass;
         private Object payload;
 
@@ -63,7 +70,7 @@ public class Request {
         }
 
         public Builder addHeader(String name, String value) {
-            headers.put(name, value);
+            headers.add(new Header(name, value));
             return this;
         }
 
@@ -80,13 +87,11 @@ public class Request {
                 this.addHeader("Content-Type", contentType);
             }
 
-            var request = new Request(
+            return new Request(
                     url, method, queryParams,
                     pathParams, headers, responseClass,
                     payload
             );
-
-            return request;
         }
     }
 }
