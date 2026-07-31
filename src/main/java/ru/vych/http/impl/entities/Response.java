@@ -3,7 +3,10 @@ package ru.vych.http.impl.entities;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
+
+import java.util.List;
 
 /**
  * Класс ответа
@@ -14,10 +17,16 @@ import lombok.ToString;
 public class Response {
     private final String uuid;
     private final Request request;
-    private final Integer status;
-    private final byte[] rawBytes;
-    private final String rawBody;
-    private final Object body;
+    @Setter
+    private Integer status;
+    @Setter
+    private byte[] rawBytes;
+    @Setter
+    private String rawBody;
+    @Setter
+    private Object body;
+    @Setter
+    private List<Header> headers;
 
     /**
      * Получить тело ответа кастованное в соответствующий ответу класс,
