@@ -1,3 +1,5 @@
+# МИГРИРОВАНО В [https://github.com/vyacheslavchernov/vych-spring-toolkit](https://github.com/vyacheslavchernov/vych-spring-toolkit)
+
 # Http-клиент для использования в spring-boot приложениях
 ##  Maven
 ```xml
